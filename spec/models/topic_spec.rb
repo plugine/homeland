@@ -96,6 +96,8 @@ describe Topic, type: :model do
     t3 = create(:topic)
     t3.save
     t3.update_last_action_time
+
+    Topic.precache_hot_page is_rank_day: true
     expect(Topic.hot_page( is_rank_day: true ).map(&:id)).to eq([t1.id, t2.id, t3.id])
   end
 

@@ -321,7 +321,6 @@ class Topic < ApplicationRecord
       t2.calc_hot_score(is_rank_day: is_rank_day) <=> t1.calc_hot_score(is_rank_day: is_rank_day)
     end).take(100).map(&:id)
 
-    puts cache_key
     $redis.set cache_key, hot_page_ids.to_json
     hot_page_ids
   end
