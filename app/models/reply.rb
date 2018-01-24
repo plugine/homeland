@@ -41,6 +41,11 @@ class Reply < ApplicationRecord
     topic.update_last_reply(self) if topic.present?
   end
 
+  # 因为会被保存多次，所以直接在控制器中手动调用此方法
+  def update_topic_last_action_time
+    topic.update_last_action_time(is_comment_action: true)
+  end
+
   # 删除的时候也要更新 Topic 的 updated_at 以便清理缓存
   after_destroy :update_parent_topic_updated_at
   def update_parent_topic_updated_at

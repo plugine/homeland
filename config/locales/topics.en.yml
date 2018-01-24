@@ -11,6 +11,8 @@
     subscribe_with_rss: "Subscribe to %{name} RSS feed."
     submit_reply: "Reply"
     topic_list:
+      hot_week: "Trending By Week"
+      hot_day: "Trending By Day"
       hot_topic: "Active Topics"
       recent: "Recent Topics"
       popular: "Popular Topics"

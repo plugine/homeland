@@ -49,6 +49,20 @@ describe TopicsController, type: :controller do
     end
   end
 
+  describe ':hot_day' do
+    it 'should have a hot_day action' do
+      get :hot_day
+      expect(response).to be_success
+    end
+  end
+
+  describe ':hot_week' do
+    it 'should have a hot_week action' do
+      get :hot_week
+      expect(response).to be_success
+    end
+  end
+
   describe ':favorites' do
     it 'should have a recent action' do
       sign_in user
@@ -245,6 +259,14 @@ describe TopicsController, type: :controller do
       expect do
         get :show, params: { id: topic.id }
       end.to change(user.notifications.unread, :count).by(-2)
+    end
+
+    it "should update topic's last_action_at when show topic" do
+      user = create :user
+      topic = create :topic, body: "@#{user.login}"
+      sign_in user
+      get :show, params: { id: topic.id }
+      expect(Time.now.to_i - Topic.find_by_id(topic.id).last_action_at < 20).to eq(true)
     end
   end
 

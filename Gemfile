@@ -124,6 +124,9 @@ gem 'homeland-wiki'
 gem 'homeland-note'
 gem 'homeland-site'
 
+# cron jobs
+gem 'whenever', require: false
+
 gem 'sdoc', '~> 1.0.0.rc3'
 
 group :development do

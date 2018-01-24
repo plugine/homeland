@@ -50,6 +50,18 @@ class Topic < ApplicationRecord
   scope :without_users,      ->(ids) { exclude_column_ids("user_id", ids) }
   scope :exclude_column_ids, ->(column, ids) { ids.empty? ? all : where.not(column => ids) }
 
+  scope :week_actioned, lambda {
+    now = Time.now
+    current_day = Time.new now.year, now.month, now.day
+    where("last_action_at > #{(current_day - 7.days).to_i}")
+  }
+
+  scope :day_actioned, lambda {
+    now = Time.now
+    current_hour = Time.new now.year, now.month, now.day, now.hour
+    where("last_action_at > #{(current_hour - 1.days).to_i}")
+  }
+
   scope :without_nodes, lambda { |node_ids|
     ids = node_ids + Topic.topic_index_hide_node_ids
     ids.uniq!
@@ -209,6 +221,44 @@ class Topic < ApplicationRecord
     reply_index + 1
   end
 
+  # 更新最后操作时间和帖子热门值分数，默认计算浏览事件，当is_comment_action为true时计算的、是评论事件
+  def update_last_action_time(is_comment_action: false)
+    now = Time.now
+    update_attribute(:last_action_at, now.to_i)
+    current_day = Time.new now.year, now.month, now.day
+
+    weight = 1
+    weight = 3 if is_comment_action
+
+    week_cache_key = "action_weight_#{Rails.env}_week_#{self.id}_#{current_day.to_i}"
+    $redis.set(week_cache_key, 0, expire: 7.days) unless $redis.exists(week_cache_key)
+    $redis.incrby(week_cache_key, weight)
+
+    current_hour = current_day + now.hour
+    day_cache_key  = "action_weight_#{Rails.env}_day_#{self.id}_#{current_hour.to_i}"
+    $redis.set(day_cache_key, 0, expire: 1.days) unless $redis.exists(day_cache_key)
+    $redis.incrby(day_cache_key, weight)
+
+  end
+
+  # 计算当前帖子的热门值分数，默认计算当周排名，当 is_rank_day 为true计算当天排名
+  def calc_hot_score(is_rank_day: true)
+    cache_key_prefix = "action_weight_#{Rails.env}_week_#{self.id}*"
+    cache_key_prefix = "action_weight_#{Rails.env}_day_#{self.id}*" if is_rank_day
+
+    max_limit = 7
+    max_limit = 24 if is_rank_day
+
+    keys = $redis.keys(cache_key_prefix).to_a
+    return 0 if keys == []
+
+    ((($redis.mget(keys).sort do |v1, v2|
+      v2[/\d+/].to_i <=> v1[/\d+/].to_i
+    end).map &:to_i).each_with_index.map do |v, i|
+      v * (max_limit - i)
+    end).reduce &:+
+  end
+
   def self.notify_topic_created(topic_id)
     topic = Topic.find_by_id(topic_id)
     return unless topic && topic.user
@@ -257,5 +307,35 @@ class Topic < ApplicationRecord
       @total_pages = 60
     end
     @total_pages
+  end
+
+  # 获取100个指定时段的的热门话题，当is_rank_hour为true是返回24小时热门，否则返回一周热门
+  def self.precache_hot_page(is_rank_day: true)
+    prepare_pages = Topic.week_actioned
+    prepare_pages = Topic.day_actioned if is_rank_day
+
+    cache_key = "hot_page_week_ids_#{Rails.env}"
+    cache_key = "hot_page_day_ids_#{Rails.env}" if is_rank_day
+
+    hot_page_ids = (prepare_pages.all.sort do |t1, t2|
+      t2.calc_hot_score(is_rank_day: is_rank_day) <=> t1.calc_hot_score(is_rank_day: is_rank_day)
+    end).take(100).map(&:id)
+
+    puts cache_key
+    $redis.set cache_key, hot_page_ids.to_json
+    hot_page_ids
+  end
+
+  def self.hot_page(is_rank_day: false)
+    cache_key = "hot_page_week_ids_#{Rails.env}"
+    cache_key = "hot_page_day_ids_#{Rails.env}" if is_rank_day
+
+    cache_ids = $redis.get(cache_key).to_s
+    if cache_ids == ''
+      cache_ids = precache_hot_page is_rank_day: is_rank_day
+    else
+      cache_ids = JSON.parse cache_ids
+    end
+    Topic.find(cache_ids)
   end
 end

@@ -11,6 +11,8 @@
     subscribe_with_rss: "订阅 %{name} 社区新话题"
     submit_reply: "提交回复"
     topic_list:
+      hot_week: "一周热门话题"
+      hot_day: "24小时热门话题"
       hot_topic: "活跃话题"
       recent: "最新创建"
       popular: "优质话题"

@@ -2,7 +2,8 @@
   <ul class="nav navbar-nav">
     <%= render_list_items do |li|
       li << link_to(t("menu.topics"), Setting.has_module?(:home) ? main_app.topics_path : main_app.root_path)
-
+      li << link_to(t("topics.topic_list.hot_week"), '/topics/hot_week')
+      li << link_to(t("topics.topic_list.hot_day"), '/topics/hot_day')
       Homeland.navbar_plugins.each do |plugin|
         li << link_to(plugin.display_name, plugin.root_path) if Setting.has_module?(plugin.name)
       end

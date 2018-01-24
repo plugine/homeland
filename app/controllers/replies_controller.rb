@@ -10,6 +10,7 @@ class RepliesController < ApplicationController
     @reply.user_id = current_user.id
 
     if @reply.save
+      @reply.update_topic_last_action_time
       current_user.read_topic(@topic)
       @msg = t("topics.reply_success")
     else

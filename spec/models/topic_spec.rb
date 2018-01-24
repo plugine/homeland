@@ -4,6 +4,11 @@ describe Topic, type: :model do
   let(:topic) { create(:topic) }
   let(:user) { create(:user) }
 
+  before do
+    $redis.keys("action_weight_#{Rails.env}_*").each {|k| $redis.del k}
+    $redis.keys("hot_page_#{Rails.env}_*").each {|k| $redis.del k}
+  end
+
   it 'should no save invalid node_id' do
     expect(build(:topic, node_id: nil).valid?).not_to be_truthy
   end
@@ -67,6 +72,42 @@ describe Topic, type: :model do
     expect(t.deleted_at).not_to eq(nil)
     t1 = create(:topic)
     expect(t1.destroy_by(nil)).to eq(false)
+  end
+
+  it 'should increment weight by ((3 + 1) * 7 when comment a reply' do
+    t = create(:topic)
+    t.update_last_action_time
+    r = create :reply, topic: t, user: user
+    r.update_topic_last_action_time
+    expect(t.calc_hot_score is_rank_day: false).to eq(28)
+  end
+
+  it 'should pick suitable hot pages' do
+    t1 = create(:topic)
+    t1.save
+    t1.update_last_action_time
+    5.times { r = create :reply, topic: t1, user: user; r.save; r.update_topic_last_action_time}
+
+    t2 = create(:topic)
+    t2.save
+    t2.update_last_action_time
+    3.times { r = create :reply, topic: t2, user: user; r.save; r.update_topic_last_action_time}
+
+    t3 = create(:topic)
+    t3.save
+    t3.update_last_action_time
+    expect(Topic.hot_page( is_rank_day: true ).map(&:id)).to eq([t1.id, t2.id, t3.id])
+  end
+
+  it 'should pre-cache suitable hot pages to redis' do
+    t = create(:topic)
+    t.save
+    t.update_last_action_time
+
+    Topic.precache_hot_page is_rank_day: false
+
+    cached = ($redis.get "hot_page_week_ids_#{Rails.env}").to_s
+    expect(cached).to eq([t.id].to_json)
   end
 
   describe '#auto_space_with_en_zh' do

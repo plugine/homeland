@@ -11,6 +11,8 @@
     subscribe_with_rss: "訂閱 %{name} 社區新帖"
     submit_reply: "提交回復"
     topic_list:
+      hot_week: "一周热门话题"
+      hot_day: "24小时热门话题"
       hot_topic: "活躍帖子"
       recent: "最新創建"
       popular: "優質帖子"
