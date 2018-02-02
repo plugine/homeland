@@ -4,11 +4,6 @@ describe Topic, type: :model do
   let(:topic) { create(:topic) }
   let(:user) { create(:user) }
 
-  before do
-    $redis.keys("action_weight_#{Rails.env}_*").each {|k| $redis.del k}
-    $redis.keys("hot_page_#{Rails.env}_*").each {|k| $redis.del k}
-  end
-
   it 'should no save invalid node_id' do
     expect(build(:topic, node_id: nil).valid?).not_to be_truthy
   end
@@ -74,42 +69,85 @@ describe Topic, type: :model do
     expect(t1.destroy_by(nil)).to eq(false)
   end
 
-  it 'should increment weight by ((3 + 1) * 7 when comment a reply' do
-    t = create(:topic)
-    t.update_last_action_time
-    r = create :reply, topic: t, user: user
-    r.update_topic_last_action_time
-    expect(t.calc_hot_score is_rank_day: false).to eq(28)
-  end
+  describe '#hot_page' do
+    it 'should have rank when view a topic' do
+      Topic.clear_cache
+      t = create(:topic)
+      t.view_action
+      expect(t.hot_day_score > 0).to eq(true)
+    end
 
-  it 'should pick suitable hot pages' do
-    t1 = create(:topic)
-    t1.save
-    t1.update_last_action_time
-    5.times { r = create :reply, topic: t1, user: user; r.save; r.update_topic_last_action_time}
+    it 'should have rank when comment a topic' do
+      Topic.clear_cache
+      t = create(:topic)
+      r = create(:reply, topic: t, user: user)
+      r.update_topic_last_action_time
+      expect(t.hot_day_score > 0).to eq(true)
+    end
 
-    t2 = create(:topic)
-    t2.save
-    t2.update_last_action_time
-    3.times { r = create :reply, topic: t2, user: user; r.save; r.update_topic_last_action_time}
+    it 'should rank daily hot pages as expect' do
+      Topic.clear_cache
+      t1 = create(:topic)
+      t2 = create(:topic)
 
-    t3 = create(:topic)
-    t3.save
-    t3.update_last_action_time
+      Timecop.travel(Time.local(2017, 1, 1, 0)) do
+        5.times do
+          r = create(:reply, topic: t1, user: user)
+          r.save
+          r.update_topic_last_action_time
+        end
+      end
+      Timecop.travel(Time.local(2017, 1, 1, 1)) do
+        Topic.merge_daily_hot_topic_score
 
-    Topic.precache_hot_page is_rank_day: true
-    expect(Topic.hot_page( is_rank_day: true ).map(&:id)).to eq([t1.id, t2.id, t3.id])
-  end
+        5.times do
+          r = create(:reply, topic: t2, user: user)
+          r.save
+          r.update_topic_last_action_time
+        end
+      end
 
-  it 'should pre-cache suitable hot pages to redis' do
-    t = create(:topic)
-    t.save
-    t.update_last_action_time
+      Timecop.travel(Time.local(2017, 1, 1, 2)) do
+        Topic.merge_daily_hot_topic_score
+      end
+      Timecop.travel(Time.local(2017, 1, 1, 3)) do
+        Topic.merge_daily_hot_topic_score
+      end
 
-    Topic.precache_hot_page is_rank_day: false
+      expect(t1.hot_day_score < t2.hot_day_score).to eq(true)
+    end
 
-    cached = ($redis.get "hot_page_week_ids_#{Rails.env}").to_s
-    expect(cached).to eq([t.id].to_json)
+    it 'should rank weekly hot pages as expect' do
+      Topic.clear_cache
+      t1 = create(:topic)
+      t2 = create(:topic)
+
+      Timecop.travel(Time.local(2017, 1, 1, 0)) do
+        5.times do
+          r = create(:reply, topic: t1, user: user)
+          r.save
+          r.update_topic_last_action_time
+        end
+      end
+      Timecop.travel(Time.local(2017, 1, 2, 0)) do
+        Topic.merge_weekly_hot_topic_score
+
+        5.times do
+          r = create(:reply, topic: t2, user: user)
+          r.save
+          r.update_topic_last_action_time
+        end
+      end
+
+      Timecop.travel(Time.local(2017, 1, 3, 0)) do
+        Topic.merge_weekly_hot_topic_score
+      end
+      Timecop.travel(Time.local(2017, 1, 4, 0)) do
+        Topic.merge_weekly_hot_topic_score
+      end
+
+      expect(t1.hot_week_score < t2.hot_week_score).to eq(true)
+    end
   end
 
   describe '#auto_space_with_en_zh' do

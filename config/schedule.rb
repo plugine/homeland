@@ -19,10 +19,10 @@
 
 # Learn more: http://github.com/javan/whenever
 
-every 10.minutes do
+every 1.hour do
   runner "DailyHotPageIndexJob.perform_now"
 end
 
-every 1.hour  do
+every 1.day  do
   runner "WeeklyHotPageIndexJob.perform_now"
 end

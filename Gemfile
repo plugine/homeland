@@ -146,6 +146,7 @@ group :development, :test do
   gem 'capybara'
   gem 'letter_opener'
   gem 'yard'
+  gem 'timecop'
 
   gem 'codecov', require: false
 end

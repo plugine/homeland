@@ -83,14 +83,14 @@ class TopicsController < ApplicationController
   end
 
   def hot_week
-    @topics = Topic.hot_page(is_rank_day: false)
+    @topics = Topic.weekly_hot
     @page_title = [t("topics.topic_list.hot_week"), t("menu.topics")].join(" · ")
 
     render action: "hot"
   end
 
   def hot_day
-    @topics = Topic.hot_page(is_rank_day: true)
+    @topics = Topic.daily_hot
     @page_title = [t("topics.topic_list.hot_week"), t("menu.topics")].join(" · ")
 
     render action: "hot"
@@ -101,7 +101,7 @@ class TopicsController < ApplicationController
     render_404 if @topic.deleted?
 
     @topic.hits.incr(1)
-    @topic.update_last_action_time
+    @topic.view_action
     @node = @topic.node
     @show_raw = params[:raw] == "1"
     @can_reply = can?(:create, Reply)
