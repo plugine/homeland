@@ -40,15 +40,13 @@ module Rankable
     # 取得100条每日热帖
     def self.daily_hot
       ids = $redis.zrevrange(Rankable.hot_page_day_rank_cache_key, 0, 100)
-      return self.find(ids) if ids.size > 1
-      [self.find(ids.first)]
+      self.find(ids)
     end
 
     # 取得100条每周热帖
     def self.weekly_hot
       ids = $redis.zrevrange(Rankable.hot_page_week_rank_cache_key, 0, 100)
-      return self.find(ids) if ids.size > 1
-      [self.find(ids.first)]
+      self.find(ids)
     end
 
     # for test environment only
